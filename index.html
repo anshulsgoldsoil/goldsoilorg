@@ -418,7 +418,8 @@ document.getElementById('collapseAll').onclick = function(){
   draw();
 };
 
-/* ---- init ---- */
+/* ---- init: start collapsed (President -> CEO -> departments visible; expand to drill in) ---- */
+collapsed = new Set(Object.values(nodeById).filter(n => n.children && n.children.length && n.id!=='president' && n.id!=='ceo').map(n => n.id));
 draw();
 </script>
 </body>
