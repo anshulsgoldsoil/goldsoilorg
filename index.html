@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoldSoil Inc. — Interactive Org Chart</title>
+<style>
+  :root{
+    --bg:#fafaf7; --surface:#ffffff;
+    --text-primary:#2c2c2a; --text-secondary:#5f5e5a; --text-tertiary:#888780;
+    --border:rgba(0,0,0,0.12); --border-strong:rgba(0,0,0,0.22);
+    --amber:#BA7517;
+
+    --leadership-bg:#FAEEDA; --leadership-border:#BA7517; --leadership-text:#633806;
+    --hr-bg:#EEEDFE; --hr-border:#7F77DD; --hr-text:#3C3489;
+    --finance-bg:#FAECE7; --finance-border:#D85A30; --finance-text:#712B13;
+    --ops-bg:#F1EFE8; --ops-border:#888780; --ops-text:#444441;
+    --tech-bg:#FBEAF0; --tech-border:#D4537E; --tech-text:#72243E;
+    --acq-bg:#E1F5EE; --acq-border:#1D9E75; --acq-text:#085041;
+    --disp-bg:#E6F1FB; --disp-border:#378ADD; --disp-text:#0C447C;
+    --pa-bg:#F1EFE8; --pa-border:#B4B2A9; --pa-text:#444441;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#1a1a18; --surface:#252523;
+      --text-primary:#e8e6dd; --text-secondary:#b4b2a9; --text-tertiary:#888780;
+      --border:rgba(255,255,255,0.15); --border-strong:rgba(255,255,255,0.28);
+      --amber:#FAC775;
+      --leadership-bg:#633806; --leadership-border:#EF9F27; --leadership-text:#FAC775;
+      --hr-bg:#3C3489; --hr-border:#AFA9EC; --hr-text:#CECBF6;
+      --finance-bg:#712B13; --finance-border:#F0997B; --finance-text:#F5C4B3;
+      --ops-bg:#444441; --ops-border:#B4B2A9; --ops-text:#D3D1C7;
+      --tech-bg:#72243E; --tech-border:#ED93B1; --tech-text:#F4C0D1;
+      --acq-bg:#085041; --acq-border:#5DCAA5; --acq-text:#9FE1CB;
+      --disp-bg:#0C447C; --disp-border:#85B7EB; --disp-text:#B5D4F4;
+      --pa-bg:#444441; --pa-border:#888780; --pa-text:#D3D1C7;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text-primary);margin:0;padding:0;min-height:100vh;}
+
+  .header{background:var(--leadership-bg);color:var(--leadership-text);padding:20px 28px;}
+  .header h1{margin:0;font-size:22px;font-weight:500;}
+  .header p{margin:3px 0 0;font-size:13px;opacity:0.9;}
+
+  .toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 28px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:30;}
+  .toolbar input[type=text]{flex:1;min-width:180px;max-width:340px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text-primary);font-size:14px;}
+  .toolbar button{padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text-secondary);font-size:13px;cursor:pointer;}
+  .toolbar button:hover{border-color:var(--border-strong);color:var(--text-primary);}
+  .toolbar .entsel{padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text-secondary);font-size:13px;cursor:pointer;}
+  .pill{font-size:12px;color:var(--text-secondary);background:var(--bg);border:1px solid var(--border);border-radius:999px;padding:5px 12px;}
+  .pill b{color:var(--amber);}
+  .hint{font-size:12px;color:var(--text-tertiary);}
+
+  .stage{padding:28px 16px 60px;overflow-x:auto;}
+
+  /* ===== classic top-down tree ===== */
+  .tree ul{display:flex;justify-content:center;padding-top:18px;position:relative;margin:0;list-style:none;}
+  .tree li{list-style:none;text-align:center;position:relative;padding:18px 6px 0;}
+  .tree li::before,.tree li::after{content:'';position:absolute;top:0;right:50%;border-top:1px solid var(--border-strong);width:50%;height:18px;}
+  .tree li::after{right:auto;left:50%;border-left:1px solid var(--border-strong);}
+  .tree li:only-child::after,.tree li:only-child::before{display:none;}
+  .tree li:only-child{padding-top:18px;}
+  .tree li:first-child::before,.tree li:last-child::after{border:0 none;}
+  .tree li:last-child::before{border-right:1px solid var(--border-strong);border-radius:0 6px 0 0;}
+  .tree li:first-child::after{border-radius:6px 0 0 0;}
+  .tree ul ul::before{content:'';position:absolute;top:0;left:50%;border-left:1px solid var(--border-strong);width:0;height:18px;}
+  .tree li.collapsed > ul{display:none;}
+  .tree li.collapsed::after{} /* spacing handled by node */
+
+  /* ===== node ===== */
+  .node{display:inline-block;position:relative;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 16px 9px 16px;min-width:128px;font-size:13px;cursor:pointer;transition:box-shadow .12s,transform .12s,opacity .15s;text-align:center;vertical-align:top;}
+  .node:hover{box-shadow:0 3px 10px rgba(0,0,0,0.10);transform:translateY(-1px);}
+  .node:focus{outline:2px solid var(--amber);outline-offset:2px;}
+  .node .role{font-weight:500;color:var(--text-primary);line-height:1.3;}
+  .node .person{margin-top:3px;font-size:11px;color:var(--text-secondary);}
+  .node .loc{margin-top:2px;font-size:10px;color:var(--text-tertiary);letter-spacing:0.02em;}
+  .node.head .loc{color:rgba(255,255,255,0.72);}
+  @media (prefers-color-scheme: dark){ .node.head .loc{color:rgba(0,0,0,0.6);} }
+  .node .badge{margin-top:3px;font-size:11px;font-weight:500;color:var(--amber);}
+  .node .toggle{position:absolute;top:-9px;left:50%;transform:translateX(-50%);width:18px;height:18px;line-height:16px;border:1px solid var(--border-strong);border-radius:50%;background:var(--surface);color:var(--text-secondary);font-size:12px;z-index:5;}
+  .node.dim{opacity:0.28;}
+  .node.match{box-shadow:0 0 0 2px var(--amber);}
+  .node.selected{box-shadow:0 0 0 2px var(--amber),0 4px 14px rgba(0,0,0,0.14);}
+
+  /* team tints */
+  .node.leadership{background:var(--leadership-bg);border-color:var(--leadership-border);}
+  .node.leadership .role{color:var(--leadership-text);}
+  .node.hr{background:var(--hr-bg);border-color:var(--hr-border);} .node.hr .role{color:var(--hr-text);}
+  .node.finance{background:var(--finance-bg);border-color:var(--finance-border);} .node.finance .role{color:var(--finance-text);}
+  .node.ops{background:var(--ops-bg);border-color:var(--ops-border);} .node.ops .role{color:var(--ops-text);}
+  .node.tech{background:var(--tech-bg);border-color:var(--tech-border);} .node.tech .role{color:var(--tech-text);}
+  .node.acq{background:var(--acq-bg);border-color:var(--acq-border);} .node.acq .role{color:var(--acq-text);}
+  .node.disp{background:var(--disp-bg);border-color:var(--disp-border);} .node.disp .role{color:var(--disp-text);}
+  .node.pa{background:var(--pa-bg);border-color:var(--pa-border);} .node.pa .role{color:var(--pa-text);}
+
+  /* head (function / sub-department) = filled dark treatment */
+  .node.head{border-width:1.5px;}
+  .node.head.hr{background:var(--hr-border);border-color:var(--hr-text);} .node.head.hr .role{color:#fff;}
+  .node.head.finance{background:var(--finance-border);border-color:var(--finance-text);} .node.head.finance .role{color:#fff;}
+  .node.head.ops{background:var(--ops-border);border-color:var(--ops-text);} .node.head.ops .role{color:#fff;}
+  .node.head.acq{background:var(--acq-border);border-color:var(--acq-text);} .node.head.acq .role{color:#fff;}
+  .node.head.disp{background:var(--disp-border);border-color:var(--disp-text);} .node.head.disp .role{color:#fff;}
+  .node.head.tech{background:var(--tech-border);border-color:var(--tech-text);} .node.head.tech .role{color:#fff;}
+  .node.head.leadership{background:var(--leadership-border);border-color:var(--leadership-text);} .node.head.leadership .role{color:#fff;font-size:15px;}
+  .node.head .person{color:rgba(255,255,255,0.85);}
+  @media (prefers-color-scheme: dark){ .node.head .role{color:#1a1a18 !important;} .node.head .person{color:rgba(0,0,0,0.7);} }
+
+  /* open / vacant */
+  .node.open{background:transparent;border-style:dashed;border-color:var(--text-tertiary);}
+  .node.open .role{color:var(--text-secondary);}
+  /* future hire — planned, not yet recruiting */
+  .node.future{background:transparent;border-style:dotted;border-color:var(--disp-border);border-width:1.5px;}
+  .node.future .role{color:var(--text-secondary);}
+  .node.future .badge{color:var(--disp-border);}
+
+  /* PA dotted link cue */
+  .node.dotted{border-style:dashed;}
+
+  /* ===== details panel ===== */
+  .panel{position:fixed;top:0;right:0;height:100%;width:320px;max-width:88vw;background:var(--surface);border-left:1px solid var(--border);box-shadow:-8px 0 30px rgba(0,0,0,0.12);padding:24px 22px;transform:translateX(105%);transition:transform .22s ease;z-index:40;overflow-y:auto;}
+  .panel.open{transform:translateX(0);}
+  .panel-close{position:absolute;top:14px;right:16px;border:none;background:none;font-size:24px;line-height:1;color:var(--text-tertiary);cursor:pointer;}
+  .panel h2{margin:8px 0 16px;font-size:18px;font-weight:500;color:var(--text-primary);}
+  .panel-tag{display:inline-block;font-size:10px;letter-spacing:0.08em;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--bg);color:var(--text-secondary);border:1px solid var(--border);}
+  .fld-label{display:block;margin:14px 0 5px;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-tertiary);}
+  .fld{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text-primary);font-size:14px;}
+  .meta-row{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);font-size:13px;}
+  .meta-k{color:var(--text-tertiary);}
+  .meta-v{color:var(--text-primary);text-align:right;font-weight:500;}
+  .reports{list-style:none;margin:6px 0 0;padding:0;}
+  .reports li{padding:8px 10px;margin-top:6px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text-secondary);cursor:pointer;}
+  .reports li:hover{border-color:var(--amber);color:var(--text-primary);}
+
+  .legend{display:flex;flex-wrap:wrap;gap:14px;padding:0 28px 22px;font-size:12px;color:var(--text-secondary);}
+  .legend-item{display:flex;align-items:center;gap:7px;}
+  .legend-dot{width:11px;height:11px;border-radius:3px;}
+</style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>GoldSoil Inc.</h1>
+    <p>Interactive org chart — click any role for details, search a name, edit inline</p>
+  </div>
+
+  <div class="toolbar">
+    <input id="search" type="text" placeholder="Search a name or role…">
+    <select id="entity" class="entsel">
+      <option value="all">All entities</option>
+      <option value="deel">Deel · Overseas</option>
+      <option value="onpay">OnPay · US</option>
+    </select>
+    <button id="expandAll">Expand all</button>
+    <button id="collapseAll">Collapse all</button>
+    <span class="pill"><b id="peopleCount">0</b> people</span>
+    <span class="pill"><b id="openCount">0</b> open roles</span>
+    <span class="hint">Tip: click a box → edit name / status / entity</span>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><span class="legend-dot" style="background:#EF9F27"></span>Leadership</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#AFA9EC"></span>HR</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#F0997B"></span>Finance</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#888780"></span>Operations</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#ED93B1"></span>Tech / AI</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#5DCAA5"></span>Acquisitions</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#85B7EB"></span>Dispositions</div>
+    <div class="legend-item"><span class="legend-dot" style="border:1px dashed var(--text-tertiary);background:transparent"></span>Open — hiring</div>
+    <div class="legend-item"><span class="legend-dot" style="border:1.5px dotted var(--disp-border);background:transparent"></span>Future hire</div>
+  </div>
+
+  <div class="stage">
+    <div class="tree" id="tree"></div>
+  </div>
+
+  <div class="panel" id="panel"></div>
+
+<script>
+/* ===== GoldSoil interactive org chart ===== */
+/* entity: 'deel' = Deel/Overseas, 'onpay' = OnPay/US */
+
+const data = {
+  id:'president', role:'President', person:'Shachi Kaushik', team:'leadership', status:'filled', head:true,
+  children:[
+   { id:'ceo', role:'CEO', person:'Anshul Sharma', entity:'onpay', loc:'United States', team:'leadership', status:'filled', head:true,
+   children:[
+
+    /* ===== Finance (extreme left) — Bookkeeping & Taxation ===== */
+    { id:'fin', role:'Finance', team:'finance', status:'function', head:true, children:[
+        { id:'karley', role:'Bookkeeping', person:'Karley Welty', entity:'onpay', loc:'United States', team:'finance', status:'filled' },
+        { id:'kevin',  role:'CPA / Taxes', person:'Kevin Denny',  entity:'onpay', loc:'United States', team:'finance', status:'filled' },
+    ]},
+
+    /* ===== Operations Core ===== */
+    { id:'ops', role:'Operations Core', team:'ops', status:'function', head:true, children:[
+        { id:'tech', role:'Technology / AI', person:'Leslie Bernolo', entity:'deel', team:'tech', status:'filled', head:true },
+        { id:'pa', role:'PA / Chief of Chores / Office Manager', person:'Jacqueline Adamson', entity:'onpay', loc:'United States', team:'ops', status:'filled', children:[
+            { id:'webdev', role:'Website Development', person:'Minakshi Sharma', entity:'deel', team:'tech', status:'filled' },
+        ]},
+    ]},
+
+    /* ===== HR ===== */
+    { id:'hr', role:'HR', person:'Queen Gilbert', personRole:'HR Head', team:'hr', status:'filled', head:true, children:[
+        { id:'christy', role:'Recruiting', person:'Christy Recio', entity:'onpay', loc:'United States', team:'hr', status:'filled' },
+    ]},
+
+    /* ===== Acquisitions ===== */
+    { id:'acq', role:'Acquisitions', team:'acq', status:'function', head:true, children:[
+      { id:'acqleader', role:'Acquisitions Ops', team:'acq', status:'open', future:true, children:[
+        { id:'art', role:'Comps Lead', person:'Art Oaing', entity:'deel', loc:'Philippines', team:'acq', status:'filled', head:true, children:[
+            { id:'edcel', role:'Wholesale Comps', person:'Edcel Abalos', entity:'deel', loc:'Philippines', team:'acq', status:'filled', head:true, children:[
+                { id:'erl',  role:'Comps Analyst', person:'Erl Timothy Gutierrez', entity:'deel', loc:'Philippines', team:'acq', status:'filled' },
+                { id:'nath', role:'Comps Analyst', person:'Nathaniel Oaing',       entity:'deel', loc:'Philippines', team:'acq', status:'filled' },
+            ]},
+            { id:'rez', role:'Subdivide Comps', person:'Rezello Perez', entity:'deel', loc:'Philippines', team:'acq', status:'filled' },
+        ]},
+        { id:'saul',    role:'LAM',         person:'Saul Orton',      entity:'onpay', loc:'United States', team:'acq', status:'filled' },
+        { id:'mariam',  role:'LAM',         person:'Mariam Farouk',   entity:'deel',  loc:'Egypt',   team:'acq', status:'filled' },
+        { id:'whitney', role:'LAM / Coach', person:'Whitney Simpson', entity:'deel',  loc:'Jamaica', team:'acq', status:'filled' },
+        { id:'juan', role:'LIMs Manager', person:'Juan Larrea', entity:'deel', loc:'Mexico', team:'acq', status:'filled', head:true, children:[
+            { id:'maryam',  role:'LIM', person:'Maryam Selim',     entity:'deel', loc:'Egypt', team:'acq', status:'filled' },
+            { id:'ahmed',   role:'LIM', person:'Ahmed Abdelbaset', entity:'deel', loc:'Egypt', team:'acq', status:'filled' },
+            { id:'martina', role:'LIM', person:'Martina Misheal',  entity:'deel', loc:'Egypt', team:'acq', status:'filled' },
+            { id:'nada',    role:'LIM', person:'Nada',             entity:'deel', loc:'Egypt', team:'acq', status:'filled' },
+        ]},
+      ]},
+    ]},
+
+    /* ===== Disposition Ops (consolidated) ===== */
+    { id:'dispops', role:'Disposition Ops', team:'disp', status:'function', head:true, children:[
+        { id:'displeader', role:'Disposition Ops Leader', team:'disp', status:'open', future:true, children:[
+            { id:'salesmkt', role:'Sales & Marketing Manager', team:'disp', status:'open', future:true, children:[
+                { id:'mktgteam', role:'Marketing', team:'disp', status:'function', head:true, children:[
+                    { id:'ellyse', role:'Marketing', person:'Ellyse Mae Tadifa', entity:'deel', loc:'Philippines', team:'disp', status:'filled' },
+                    { id:'sheila', role:'Marketing', person:'Sheila Oaing',      entity:'deel', loc:'Philippines', team:'disp', status:'filled' },
+                ]},
+                { id:'salesteam', role:'Sales', team:'disp', status:'function', head:true, children:[
+                    { id:'jose',    role:'Sales', person:'Jose Membreno',  entity:'deel', loc:'Nicaragua',   team:'disp', status:'filled' },
+                    { id:'gabriel', role:'Sales', person:'Gabriel Santos', entity:'deel', loc:'Philippines', team:'disp', status:'filled' },
+                ]},
+            ]},
+            { id:'tc', role:'Transaction Coordinator', person:'Pracy-Ann Pryce', entity:'deel', loc:'Jamaica', team:'disp', status:'filled' },
+        ]},
+    ]},
+
+   ]
+   }
+  ]
+};
+
+/* ---- indexing ---- */
+const nodeById = {};
+const parentById = {};
+(function index(node, parent){
+  nodeById[node.id] = node;
+  parentById[node.id] = parent ? parent.id : null;
+  (node.children||[]).forEach(c => index(c, node));
+})(data, null);
+
+function nearestManager(id){
+  let p = parentById[id];
+  while(p){ if(nodeById[p].person) return nodeById[p]; p = parentById[p]; }
+  return null;
+}
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const ENTITY_LABEL = { deel:'Deel \u00b7 Overseas', onpay:'OnPay \u00b7 US' };
+
+/* ---- state ---- */
+let collapsed = new Set();
+let query = '';
+let entityFilter = 'all';
+let selectedId = null;
+
+/* ---- render ---- */
+function nodeHTML(node){
+  const hasKids = node.children && node.children.length;
+  const isCol = collapsed.has(node.id);
+  const cls = ['node', node.team || '', node.status || ''];
+  if(node.head) cls.push('head');
+  if(node.future) cls.push('future');
+  if(node.dotted) cls.push('dotted');
+  if(node.id === selectedId) cls.push('selected');
+  let inner = '<div class="role">' + esc(node.role) + '</div>';
+  if(node.person){ inner += '<div class="person">' + esc(node.person) + '</div>'; }
+  else if(node.status === 'open'){ inner += '<div class="badge">' + (node.future ? 'Future hire' : 'Open \u2014 hiring') + '</div>'; }
+  if(node.loc){ inner += '<div class="loc">' + esc(node.loc) + '</div>'; }
+  const toggle = hasKids ? '<span class="toggle" data-toggle="'+node.id+'">'+(isCol?'+':'\u2013')+'</span>' : '';
+  return '<div class="'+cls.join(' ').replace(/\s+/g,' ').trim()+'" data-id="'+node.id+'" tabindex="0">'+toggle+inner+'</div>';
+}
+function render(node){
+  const isCol = collapsed.has(node.id);
+  let html = '<li data-id="'+node.id+'"'+(isCol?' class="collapsed"':'')+'>' + nodeHTML(node);
+  if(node.children && node.children.length){ html += '<ul>' + node.children.map(render).join('') + '</ul>'; }
+  html += '</li>';
+  return html;
+}
+function openCount(){ return Object.values(nodeById).filter(n => n.status === 'open').length; }
+function peopleCount(){
+  const set = new Set();
+  Object.values(nodeById).forEach(n => { if(n.person) set.add(n.person); });
+  return set.size;
+}
+function draw(){
+  document.getElementById('tree').innerHTML = '<ul>' + render(data) + '</ul>';
+  document.getElementById('openCount').textContent = openCount();
+  document.getElementById('peopleCount').textContent = peopleCount();
+  applyFilters();
+}
+
+/* ---- search + entity filter ---- */
+function applyFilters(){
+  const q = query.trim().toLowerCase();
+  const ent = entityFilter;
+  const nodes = Array.prototype.slice.call(document.querySelectorAll('.node'));
+  let keep = null;
+  if(q){
+    const matchIds = new Set();
+    Object.values(nodeById).forEach(n => {
+      const hay = ((n.role||'') + ' ' + (n.person||'')).toLowerCase();
+      if(hay.indexOf(q) !== -1) matchIds.add(n.id);
+    });
+    keep = new Set();
+    matchIds.forEach(id => { let c = id; while(c){ keep.add(c); c = parentById[c]; } });
+    nodes.forEach(n => n.classList.toggle('match', matchIds.has(n.getAttribute('data-id'))));
+  } else {
+    nodes.forEach(n => n.classList.remove('match'));
+  }
+  nodes.forEach(n => {
+    const id = n.getAttribute('data-id');
+    const node = nodeById[id];
+    let dim = false;
+    if(q && keep && !keep.has(id)) dim = true;
+    if(ent !== 'all' && node.entity && node.entity !== ent) dim = true;
+    n.classList.toggle('dim', dim);
+  });
+}
+
+/* ---- details panel ---- */
+function showDetails(id){
+  selectedId = id;
+  const n = nodeById[id];
+  const parent = parentById[id] ? nodeById[parentById[id]] : null;
+  const mgr = nearestManager(id);
+  const kids = (n.children||[]);
+  const panel = document.getElementById('panel');
+  let html = '';
+  html += '<button class="panel-close" id="panelClose">\u00d7</button>';
+  html += '<div class="panel-tag '+(n.team||'')+'">'+esc((n.team||'team').toUpperCase())+'</div>';
+  html += '<h2>'+esc(n.role)+'</h2>';
+  html += '<label class="fld-label">Name</label>';
+  html += '<input id="nameInput" class="fld" type="text" value="'+esc(n.person||'')+'" placeholder="Vacant \u2014 add a name">';
+  html += '<label class="fld-label">Status</label>';
+  html += '<select id="statusInput" class="fld">'
+        + '<option value="filled"'+(n.status==='filled'?' selected':'')+'>Filled</option>'
+        + '<option value="open"'+(n.status==='open'?' selected':'')+'>Open \u2014 hiring</option>'
+        + '<option value="function"'+(n.status==='function'?' selected':'')+'>Function / area</option>'
+        + '</select>';
+  html += '<label class="fld-label">Payroll entity</label>';
+  html += '<select id="entInput" class="fld">'
+        + '<option value=""'+(!n.entity?' selected':'')+'>\u2014 none</option>'
+        + '<option value="deel"'+(n.entity==='deel'?' selected':'')+'>Deel \u00b7 Overseas</option>'
+        + '<option value="onpay"'+(n.entity==='onpay'?' selected':'')+'>OnPay \u00b7 US</option>'
+        + '</select>';
+  html += '<label class="fld-label">Location</label>';
+  html += '<input id="locInput" class="fld" type="text" value="'+esc(n.loc||'')+'" placeholder="Country / location">';
+  html += '<div class="meta-row"><span class="meta-k">Reports to</span><span class="meta-v">'+esc(parent ? parent.role : '\u2014')+'</span></div>';
+  html += '<div class="meta-row"><span class="meta-k">Manager</span><span class="meta-v">'+esc(mgr ? (mgr.person + ' (' + mgr.role + ')') : '\u2014')+'</span></div>';
+  html += '<div class="meta-row"><span class="meta-k">Direct reports</span><span class="meta-v">'+kids.length+'</span></div>';
+  if(kids.length){
+    html += '<ul class="reports">';
+    kids.forEach(k => {
+      const who = k.person ? (' \u2014 ' + esc(k.person)) : (k.status==='open' ? ' \u2014 <em>open</em>' : '');
+      html += '<li data-jump="'+k.id+'">'+esc(k.role)+who+'</li>';
+    });
+    html += '</ul>';
+  }
+  panel.innerHTML = html;
+  panel.classList.add('open');
+  document.getElementById('panelClose').onclick = closeDetails;
+  document.getElementById('nameInput').addEventListener('input', function(e){
+    n.person = e.target.value;
+    if(n.person && n.status === 'open'){ n.status = 'filled'; }
+    draw();
+  });
+  document.getElementById('statusInput').addEventListener('change', function(e){ n.status = e.target.value; draw(); });
+  document.getElementById('entInput').addEventListener('change', function(e){ n.entity = e.target.value || undefined; draw(); });
+  document.getElementById('locInput').addEventListener('input', function(e){ n.loc = e.target.value || undefined; draw(); });
+  panel.querySelectorAll('[data-jump]').forEach(li => { li.onclick = () => showDetails(li.getAttribute('data-jump')); });
+  draw();
+}
+function closeDetails(){ selectedId = null; document.getElementById('panel').classList.remove('open'); draw(); }
+
+/* ---- events ---- */
+document.getElementById('tree').addEventListener('click', function(e){
+  const tog = e.target.closest('[data-toggle]');
+  if(tog){
+    const id = tog.getAttribute('data-toggle');
+    if(collapsed.has(id)) collapsed.delete(id); else collapsed.add(id);
+    draw(); return;
+  }
+  const node = e.target.closest('.node');
+  if(node){ showDetails(node.getAttribute('data-id')); }
+});
+document.getElementById('search').addEventListener('input', function(e){
+  query = e.target.value;
+  if(query.trim()) collapsed.clear();
+  draw();
+});
+document.getElementById('entity').addEventListener('change', function(e){
+  entityFilter = e.target.value;
+  if(entityFilter !== 'all') collapsed.clear();
+  draw();
+});
+document.getElementById('expandAll').onclick = function(){ collapsed.clear(); draw(); };
+document.getElementById('collapseAll').onclick = function(){
+  collapsed = new Set(Object.values(nodeById).filter(n => n.children && n.children.length && n.id!=='president').map(n => n.id));
+  draw();
+};
+
+/* ---- init ---- */
+draw();
+</script>
+</body>
+</html>
